@@ -121,4 +121,5 @@ twistImage imgPath params@(NestingParams center period) = do
 
 main :: IO ()
 -- main = fillInNesting "assets/escher.jpg" (NestingParams (850,850) 10)
-main = twistImage "assets/droste.jpg" (NestingParams (140,1455) 10)
+-- main = twistImage "assets/droste.jpg" (NestingParams (140,1455) 10)
+main = twistImage "assets/costarica.jpg" (NestingParams (1578,1666) 140)
