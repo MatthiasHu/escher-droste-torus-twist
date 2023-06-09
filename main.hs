@@ -25,7 +25,14 @@ directQuery img x y =
 --  (trace $ "directQuery " ++ show x ++ "," ++ show y) $
   lookupPixel img (round x) (round y)
 
-nestedQuery :: DiscreteImage -> NestingParams -> Float -> Float -> Color
+type PlaneImage = Float -> Float -> Color
+
+-- Social contract:
+--   f (period * x) (period * y) = f x y
+-- for some "period".
+type NestedImage = Float -> Float -> Color
+
+nestedQuery :: DiscreteImage -> NestingParams -> NestedImage
 nestedQuery img (NestingParams (cx, cy) period) x y =
   inward (outward 0)
   where
@@ -42,11 +49,36 @@ nestedQuery img (NestingParams (cx, cy) period) x y =
         Just x -> x
 
 -- Social contract:
---   f (x + 1) y = f x (y + 1) = f x y
+--   f (r + 1) phi = f r (phi + 1) = f r phi
 type TorusImage = Float -> Float -> Color
 
 twist :: TorusImage -> TorusImage
-twist f x y = f x (x + y)
+twist f x y = f (x + y) y
+
+tau :: (Floating a) => a
+tau = 2 * pi
+
+toTorusPoint :: Float -> (Float, Float) -> (Float, Float)
+toTorusPoint period (x, y) = (r, phi)
+  where
+    r = log (sqrt (x*x + y*y)) / log period
+    phi = atan2 y x / tau
+
+fromTorusPoint :: Float -> (Float, Float) -> (Float, Float)
+fromTorusPoint period (r, phi) = (x, y)
+  where
+    x = (period**r * cos (phi * tau))
+    y = (period**r * sin (phi * tau))
+
+toTorus :: Float -> NestedImage -> TorusImage
+toTorus period f r phi = f x y
+  where
+    (x, y) = fromTorusPoint period (r, phi)
+
+fromTorus :: Float -> TorusImage -> NestedImage
+fromTorus period f x y = f r phi
+  where
+    (r, phi) = toTorusPoint period (x, y)
 
 load :: FilePath -> IO DiscreteImage
 load imgPath = do
@@ -55,8 +87,14 @@ load imgPath = do
     Left err -> error err
     Right dynImg -> return (P.convertRGB8 dynImg)
 
-discretize :: (Float -> Float -> Color) -> Int -> DiscreteImage
-discretize colorAt width =
+save :: DiscreteImage -> IO ()
+save img = do
+  P.saveJpgImage jpgQuality "result.jpg" (P.ImageRGB8 img)
+  where
+    jpgQuality = 90
+
+discretize :: (Float -> Float -> Color) -> DiscreteImage
+discretize colorAt =
   P.generateImage colorAt' width width
   where
     colorAt' x y =
@@ -64,18 +102,23 @@ discretize colorAt width =
         (fromIntegral (x - (width `div` 2)) + shiftToAvoidLimitPoint)
         (fromIntegral (y - (width `div` 2)))
     shiftToAvoidLimitPoint = 0.1
+    -- output width (and height)
+    width = 1000
 
 -- Fill in the nested parts of a picture in case they are missing.
 fillInNesting :: FilePath -> NestingParams -> IO ()
 fillInNesting imgPath params = do
   img <- load imgPath
-  let filledIn = discretize (nestedQuery img params) outputWidth
-  P.saveJpgImage jpgQuality "result.jpg" (P.ImageRGB8 filledIn)
-  where
-    outputWidth = 500
-    jpgQuality = 90
+  let filledIn = discretize (nestedQuery img params)
+  save filledIn
 
+twistImage :: FilePath -> NestingParams -> IO ()
+twistImage imgPath params@(NestingParams center period) = do
+  img <- load imgPath
+  let filledIn = nestedQuery img params
+  let twisted = fromTorus period . twist . toTorus period $ filledIn
+  save (discretize twisted)
 
 main :: IO ()
 -- main = fillInNesting "assets/escher.jpg" (NestingParams (850,850) 10)
-main = fillInNesting "assets/droste.jpg" (NestingParams (130,1450) 10)
+main = twistImage "assets/droste.jpg" (NestingParams (140,1455) 10)
