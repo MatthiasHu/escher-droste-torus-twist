@@ -36,6 +36,9 @@ type PlaneImage = Float -> Float -> Color
 -- for some "period".
 type NestedImage = Float -> Float -> Color
 
+-- Note: We should probably better convert to polar coordinate images first,
+-- beforeee doing nest or torque.
+
 -- We look up the desired color as far away from the limit point as possible
 -- to retain the best possible resolution.
 -- We assume that the input "partial image" is roughly convex.
@@ -131,5 +134,10 @@ twistImage imgPath params@(NestingParams center period) = do
 
 main :: IO ()
 -- main = fillInNesting "assets/escher.jpg" (NestingParams (850,850) 10)
+main = do
+  let params = (NestingParams (850,850) 10)
+  img <- load "assets/escher.jpg"
+  let filledIn = discretize (nest params (centeredQuery params img))
+  save filledIn
 -- main = twistImage "assets/droste.jpg" (NestingParams (140,1455) 10)
-main = twistImage "assets/costarica.jpg" (NestingParams (1578,1666) 140)
+-- main = twistImage "assets/costarica.jpg" (NestingParams (1578,1666) 140)
