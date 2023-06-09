@@ -71,14 +71,14 @@ twist n f x y = f (x + n*y) y
 tau :: (Floating a) => a
 tau = 2 * pi
 
-toTorusPoint :: Float -> (Float, Float) -> (Float, Float)
-toTorusPoint period (x, y) = (r, phi)
+toPolar :: Float -> (Float, Float) -> (Float, Float)
+toPolar period (x, y) = (r, phi)
   where
     r = log (sqrt (x*x + y*y)) / log period
     phi = atan2 y x / tau
 
-fromTorusPoint :: Float -> (Float, Float) -> (Float, Float)
-fromTorusPoint period (r, phi) = (x, y)
+fromPolar :: Float -> (Float, Float) -> (Float, Float)
+fromPolar period (r, phi) = (x, y)
   where
     x = (period**r * cos (phi * tau))
     y = (period**r * sin (phi * tau))
@@ -86,12 +86,12 @@ fromTorusPoint period (r, phi) = (x, y)
 toTorus :: Float -> NestedImage -> TorusImage
 toTorus period f r phi = f x y
   where
-    (x, y) = fromTorusPoint period (r, phi)
+    (x, y) = fromPolar period (r, phi)
 
 fromTorus :: Float -> TorusImage -> NestedImage
 fromTorus period f x y = f r phi
   where
-    (r, phi) = toTorusPoint period (x, y)
+    (r, phi) = toPolar period (x, y)
 
 load :: FilePath -> IO DiscreteImage
 load imgPath = do
