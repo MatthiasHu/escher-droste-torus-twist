@@ -25,8 +25,8 @@ directQuery img x y =
 --  (trace $ "directQuery " ++ show x ++ "," ++ show y) $
   lookupPixel img (round x) (round y)
 
-centeredQuery :: DiscreteImage -> NestingParams -> Float -> Float -> Maybe Color
-centeredQuery img params@(NestingParams (cx, cy) period) x y =
+centeredQuery :: NestingParams -> DiscreteImage -> Float -> Float -> Maybe Color
+centeredQuery params@(NestingParams (cx, cy) period) img x y =
   directQuery img (x + cx) (y + cy)
 
 type PlaneImage = Float -> Float -> Color
@@ -55,8 +55,8 @@ nest params@(NestingParams center period) f x y =
         Nothing -> inward (i - 1)
         Just x -> x
 
-nestedQuery :: DiscreteImage -> NestingParams -> NestedImage
-nestedQuery img params = nest params (centeredQuery img params)
+nestedQuery :: NestingParams -> DiscreteImage -> NestedImage
+nestedQuery params = nest params . centeredQuery params
 
 -- Social contract:
 --   f (r + 1) phi = f r (phi + 1) = f r phi
@@ -119,13 +119,13 @@ discretize colorAt =
 fillInNesting :: FilePath -> NestingParams -> IO ()
 fillInNesting imgPath params = do
   img <- load imgPath
-  let filledIn = discretize (nestedQuery img params)
+  let filledIn = discretize (nestedQuery params img)
   save filledIn
 
 twistImage :: FilePath -> NestingParams -> IO ()
 twistImage imgPath params@(NestingParams center period) = do
   img <- load imgPath
-  let filledIn = nestedQuery img params
+  let filledIn = nestedQuery params img
   let twisted = fromTorus period . twist (-1) . toTorus period $ filledIn
   save (discretize twisted)
 
