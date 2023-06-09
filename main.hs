@@ -61,6 +61,14 @@ nest params@(NestingParams center period) f x y =
 nestedQuery :: NestingParams -> DiscreteImage -> NestedImage
 nestedQuery params = nest params . centeredQuery params
 
+-- Remove (or add) artificial rotation/torque.
+torque :: Float -> Float -> (Float -> Float -> a) -> (Float -> Float -> a)
+torque period dphi f x y = f x' y'
+  where
+    (r, phi) = toPolar period (x, y)
+    phi' = phi + dphi * log r / log period
+    (x', y') = fromPolar period (r, phi')
+
 -- Social contract:
 --   f (r + 1) phi = f r (phi + 1) = f r phi
 type TorusImage = Float -> Float -> Color
@@ -135,9 +143,17 @@ twistImage imgPath params@(NestingParams center period) = do
 main :: IO ()
 -- main = fillInNesting "assets/escher.jpg" (NestingParams (850,850) 10)
 main = do
-  let params = (NestingParams (850,850) 10)
+  let period = 14
+  let params = (NestingParams (900,860) period)
   img <- load "assets/escher.jpg"
-  let filledIn = discretize (nest params (centeredQuery params img))
-  save filledIn
+  save
+    . discretize
+    . fromTorus period
+    . twist 1
+    . toTorus period
+    . nest params
+    . torque period (-0.35*tau)
+    . centeredQuery params
+    $ img
 -- main = twistImage "assets/droste.jpg" (NestingParams (140,1455) 10)
 -- main = twistImage "assets/costarica.jpg" (NestingParams (1578,1666) 140)
