@@ -65,6 +65,7 @@ discretize colorAt width =
         (fromIntegral (y - (width `div` 2)))
     shiftToAvoidLimitPoint = 0.1
 
+-- Fill in the nested parts of a picture in case they are missing.
 fillInNesting :: FilePath -> NestingParams -> IO ()
 fillInNesting imgPath params = do
   img <- load imgPath
@@ -76,4 +77,5 @@ fillInNesting imgPath params = do
 
 
 main :: IO ()
-main = fillInNesting "assets/escher.jpg" (NestingParams (850,850) 10)
+-- main = fillInNesting "assets/escher.jpg" (NestingParams (850,850) 10)
+main = fillInNesting "assets/droste.jpg" (NestingParams (130,1450) 10)
