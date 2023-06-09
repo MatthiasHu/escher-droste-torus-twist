@@ -25,6 +25,10 @@ directQuery img x y =
 --  (trace $ "directQuery " ++ show x ++ "," ++ show y) $
   lookupPixel img (round x) (round y)
 
+centeredQuery :: DiscreteImage -> NestingParams -> Float -> Float -> Maybe Color
+centeredQuery img params@(NestingParams (cx, cy) period) x y =
+  directQuery img (x + cx) (y + cy)
+
 type PlaneImage = Float -> Float -> Color
 
 -- Social contract:
@@ -32,14 +36,17 @@ type PlaneImage = Float -> Float -> Color
 -- for some "period".
 type NestedImage = Float -> Float -> Color
 
-nestedQuery :: DiscreteImage -> NestingParams -> NestedImage
-nestedQuery img (NestingParams (cx, cy) period) x y =
+-- We look up the desired color as far away from the limit point as possible
+-- to retain the best possible resolution.
+-- We assume that the input "partial image" is roughly convex.
+nest :: NestingParams -> (Float -> Float -> Maybe Color) -> NestedImage
+nest params@(NestingParams center period) f x y =
   inward (outward 0)
   where
     x' i = (period^^i) * x
     y' i = (period^^i) * y
 
-    lookup i = directQuery img (x' i + cx) (y' i + cy)
+    lookup i = f (x' i) (y' i)
     test = isJust . lookup
 
     outward i = if test i then outward (i + 1) else i
@@ -47,6 +54,9 @@ nestedQuery img (NestingParams (cx, cy) period) x y =
       case lookup i of
         Nothing -> inward (i - 1)
         Just x -> x
+
+nestedQuery :: DiscreteImage -> NestingParams -> NestedImage
+nestedQuery img params = nest params (centeredQuery img params)
 
 -- Social contract:
 --   f (r + 1) phi = f r (phi + 1) = f r phi
