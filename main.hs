@@ -6,7 +6,6 @@ import Data.Maybe (isJust)
 type Color = P.PixelRGB8
 type Image = P.Image Color
 
-
 data NestingParams = NestingParams
   { center :: (Float, Float)
   , period :: Float
@@ -22,20 +21,21 @@ lookupPixel img x y =
     h = P.imageHeight img
 
 directQuery :: Image -> Float -> Float -> Maybe Color
-directQuery img x y = lookupPixel img (round x) (round y)
+directQuery img x y =
+--  (trace $ "directQuery " ++ show x ++ "," ++ show y) $
+  lookupPixel img (round x) (round y)
 
 nestedQuery :: Image -> NestingParams -> Float -> Float -> Color
 nestedQuery img (NestingParams (cx, cy) period) x y =
-  undefined
---  inward (outward 0)
+  inward (outward 0)
   where
-    x' i = cx + ((period^^i) * (x - cx))
-    y' i = cy + ((period^^i) * (y - cy))
+    x' i = (period^^i) * x
+    y' i = (period^^i) * y
 
-    lookup i = directQuery img (x' i) (y' i)
+    lookup i = directQuery img (x' i + cx) (y' i + cy)
     test = isJust . lookup
 
-    outward i = if test i then outward (i + i) else i
+    outward i = if test i then outward (i + 1) else i
     inward i =
       case lookup i of
         Nothing -> inward (i - 1)
@@ -48,5 +48,32 @@ type TorusImage = Float -> Float -> Color
 twist :: TorusImage -> TorusImage
 twist f x y = f x (x + y)
 
+load :: FilePath -> IO Image
+load imgPath = do
+  eitherDynImg <- P.readImage imgPath
+  case eitherDynImg of
+    Left err -> error err
+    Right dynImg -> return (P.convertRGB8 dynImg)
+
+discretize :: (Float -> Float -> Color) -> Int -> Image
+discretize colorAt width =
+  P.generateImage colorAt' width width
+  where
+    colorAt' x y =
+      colorAt
+        (fromIntegral (x - (width `div` 2)) + shiftToAvoidLimitPoint)
+        (fromIntegral (y - (width `div` 2)))
+    shiftToAvoidLimitPoint = 0.1
+
+fillInNesting :: FilePath -> NestingParams -> IO ()
+fillInNesting imgPath params = do
+  img <- load imgPath
+  let filledIn = discretize (nestedQuery img params) outputWidth
+  P.saveJpgImage jpgQuality "result.jpg" (P.ImageRGB8 filledIn)
+  where
+    outputWidth = 500
+    jpgQuality = 90
+
+
 main :: IO ()
-main = undefined
+main = fillInNesting "assets/escher.jpg" (NestingParams (850,850) 10)
