@@ -4,14 +4,14 @@ import Data.Maybe (isJust)
 
 
 type Color = P.PixelRGB8
-type Image = P.Image Color
+type DiscreteImage = P.Image Color
 
 data NestingParams = NestingParams
   { center :: (Float, Float)
   , period :: Float
   }
 
-lookupPixel :: Image -> Int -> Int -> Maybe Color
+lookupPixel :: DiscreteImage -> Int -> Int -> Maybe Color
 lookupPixel img x y =
   if x >= 0 && x < w && y >= 0 && y < h
   then Just (P.pixelAt img x y)
@@ -20,12 +20,12 @@ lookupPixel img x y =
     w = P.imageWidth img
     h = P.imageHeight img
 
-directQuery :: Image -> Float -> Float -> Maybe Color
+directQuery :: DiscreteImage -> Float -> Float -> Maybe Color
 directQuery img x y =
 --  (trace $ "directQuery " ++ show x ++ "," ++ show y) $
   lookupPixel img (round x) (round y)
 
-nestedQuery :: Image -> NestingParams -> Float -> Float -> Color
+nestedQuery :: DiscreteImage -> NestingParams -> Float -> Float -> Color
 nestedQuery img (NestingParams (cx, cy) period) x y =
   inward (outward 0)
   where
@@ -48,14 +48,14 @@ type TorusImage = Float -> Float -> Color
 twist :: TorusImage -> TorusImage
 twist f x y = f x (x + y)
 
-load :: FilePath -> IO Image
+load :: FilePath -> IO DiscreteImage
 load imgPath = do
   eitherDynImg <- P.readImage imgPath
   case eitherDynImg of
     Left err -> error err
     Right dynImg -> return (P.convertRGB8 dynImg)
 
-discretize :: (Float -> Float -> Color) -> Int -> Image
+discretize :: (Float -> Float -> Color) -> Int -> DiscreteImage
 discretize colorAt width =
   P.generateImage colorAt' width width
   where
