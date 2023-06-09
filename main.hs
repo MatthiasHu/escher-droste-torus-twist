@@ -52,8 +52,8 @@ nestedQuery img (NestingParams (cx, cy) period) x y =
 --   f (r + 1) phi = f r (phi + 1) = f r phi
 type TorusImage = Float -> Float -> Color
 
-twist :: TorusImage -> TorusImage
-twist f x y = f (x + y) y
+twist :: Float -> TorusImage -> TorusImage
+twist n f x y = f (x + n*y) y
 
 tau :: (Floating a) => a
 tau = 2 * pi
@@ -103,7 +103,7 @@ discretize colorAt =
         (fromIntegral (y - (width `div` 2)))
     shiftToAvoidLimitPoint = 0.1
     -- output width (and height)
-    width = 1000
+    width = 500
 
 -- Fill in the nested parts of a picture in case they are missing.
 fillInNesting :: FilePath -> NestingParams -> IO ()
@@ -116,7 +116,7 @@ twistImage :: FilePath -> NestingParams -> IO ()
 twistImage imgPath params@(NestingParams center period) = do
   img <- load imgPath
   let filledIn = nestedQuery img params
-  let twisted = fromTorus period . twist . toTorus period $ filledIn
+  let twisted = fromTorus period . twist (-1) . toTorus period $ filledIn
   save (discretize twisted)
 
 main :: IO ()
