@@ -113,24 +113,24 @@ save img = do
   where
     jpgQuality = 90
 
-{-
 (-.) = flip (.)
 
 main :: IO ()
 main =
   let
-    s = 14
+    s = NestingScale 14
     center = (900,860)
   in
     load "assets/escher.jpg" >>=
     (
        undiscretize
+    -. translate center
+    -. toPolar s
     -. torque (-0.35)
-    -. nest params
-    -. toTorus period
+    -. nest
     -. twist 1
-    -. fromTorus period
-    -. discretize
+    -. forgetToroidal
+    -. fromPolar s
+    -. discretize 500
     -. save
     )
--}
