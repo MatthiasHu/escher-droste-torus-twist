@@ -7,10 +7,7 @@ type Color = P.PixelRGB8
 type DiscreteImage = P.Image Color
 
 newtype Cartesian a = Cartesian ((Float, Float) -> a)
-type CartesianImage = Cartesian Color
-
 newtype Polar a = Polar ((Float, Float) -> a)
-type PolarImage = Polar Color
 
 lookupPixel :: DiscreteImage -> Int -> Int -> Maybe Color
 lookupPixel img x y =
@@ -24,6 +21,16 @@ lookupPixel img x y =
 undiscretize :: DiscreteImage -> Cartesian (Maybe Color)
 undiscretize img = Cartesian $ \(x, y) ->
   lookupPixel img (round x) (round y)
+
+discretize :: Int -> Cartesian Color -> DiscreteImage
+discretize width (Cartesian colorAt) =
+  P.generateImage colorAt' width width
+  where
+    colorAt' x y =
+      colorAt
+        ( fromIntegral (x - (width `div` 2)) + shiftToAvoidLimitPoint
+        , fromIntegral (y - (width `div` 2)) )
+    shiftToAvoidLimitPoint = 0.1
 
 newtype NestingScale = NestingScale Float
 
@@ -50,15 +57,13 @@ translate :: (Float, Float) -> Cartesian a -> Cartesian a
 translate (cx, cy) (Cartesian f) = Cartesian $ \(x, y) ->
   f (cx + x, cy + y)
 
-{-
 -- We look up the desired color as far away from the limit point as possible
 -- to retain the best possible resolution.
 -- We assume that the input "partial image" is roughly convex.
 nest :: Polar (Maybe a) -> Polar a
 nest (Polar f) = Polar $ \(r, phi) ->
-  inward (outward 0)
-  where
-    r' i = x + (fromIntegral i)
+  let
+    r' i = r + (fromIntegral i)
 
     lookup i = f (r' i, phi)
     test = isJust . lookup
@@ -68,34 +73,21 @@ nest (Polar f) = Polar $ \(r, phi) ->
       case lookup i of
         Nothing -> inward (i - 1)
         Just x -> x
+  in
+    inward (outward 0)
 
-nestedQuery :: NestingParams -> DiscreteImage -> NestedImage
-nestedQuery params = nest params . centeredQuery params
+rotate :: Float -> Polar a -> Polar a
+rotate dphi (Polar f) = Polar $ \(r, phi) ->
+  f (r, phi - dphi)
 
--- Remove (or add) artificial rotation/torque.
-torque :: Float -> Float -> (Float -> Float -> a) -> (Float -> Float -> a)
-torque period dphi f x y = f x' y'
-  where
-    (r, phi) = toPolar period (x, y)
-    phi' = phi + dphi * log r / log period
-    (x', y') = fromPolar period (r, phi')
+-- Remove (or add) artificial torque (rotation increasing towards limit point)
+torque :: Float -> Polar a -> Polar a
+torque dphi (Polar f) = Polar $ \(r, phi) ->
+  f (r, phi + dphi * r)
 
--- Social contract:
---   f (r + 1) phi = f r (phi + 1) = f r phi
-type TorusImage = Float -> Float -> Color
-
-twist :: Float -> TorusImage -> TorusImage
-twist n f x y = f (x + n*y) y
-
-toTorus :: Float -> NestedImage -> TorusImage
-toTorus period f r phi = f x y
-  where
-    (x, y) = fromPolar period (r, phi)
-
-fromTorus :: Float -> TorusImage -> NestedImage
-fromTorus period f x y = f r phi
-  where
-    (r, phi) = toPolar period (x, y)
+twist :: Float -> Polar a -> Polar a
+twist n (Polar f) = Polar $ \(r, phi) ->
+  f (r + n*phi, phi)
 
 load :: FilePath -> IO DiscreteImage
 load imgPath = do
@@ -110,47 +102,24 @@ save img = do
   where
     jpgQuality = 90
 
-discretize :: (Float -> Float -> Color) -> DiscreteImage
-discretize colorAt =
-  P.generateImage colorAt' width width
-  where
-    colorAt' x y =
-      colorAt
-        (fromIntegral (x - (width `div` 2)) + shiftToAvoidLimitPoint)
-        (fromIntegral (y - (width `div` 2)))
-    shiftToAvoidLimitPoint = 0.1
-    -- output width (and height)
-    width = 500
-
--- Fill in the nested parts of a picture in case they are missing.
-fillInNesting :: FilePath -> NestingParams -> IO ()
-fillInNesting imgPath params = do
-  img <- load imgPath
-  let filledIn = discretize (nestedQuery params img)
-  save filledIn
-
-twistImage :: FilePath -> NestingParams -> IO ()
-twistImage imgPath params@(NestingParams center period) = do
-  img <- load imgPath
-  let filledIn = nestedQuery params img
-  let twisted = fromTorus period . twist (-1) . toTorus period $ filledIn
-  save (discretize twisted)
+{-
+(-.) = flip (.)
 
 main :: IO ()
--- main = fillInNesting "assets/escher.jpg" (NestingParams (850,850) 10)
-main = do
-  let period = 14
-  let params = (NestingParams (900,860) period)
-  img <- load "assets/escher.jpg"
-  save
-    . discretize
-    . fromTorus period
-    . twist 1
-    . toTorus period
-    . nest params
-    . torque period (-0.35*tau)
-    . centeredQuery params
-    $ img
--- main = twistImage "assets/droste.jpg" (NestingParams (140,1455) 10)
--- main = twistImage "assets/costarica.jpg" (NestingParams (1578,1666) 140)
+main =
+  let
+    s = 14
+    center = (900,860)
+  in
+    load "assets/escher.jpg" >>=
+    (
+       undiscretize
+    -. torque (-0.35)
+    -. nest params
+    -. toTorus period
+    -. twist 1
+    -. fromTorus period
+    -. discretize
+    -. save
+    )
 -}
