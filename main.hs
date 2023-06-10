@@ -90,6 +90,10 @@ rotate :: Float -> Polar a -> Polar a
 rotate dphi (Polar f) = Polar $ \(r, phi) ->
   f (r, phi - dphi)
 
+zoom :: Float -> Polar a -> Polar a
+zoom dr (Polar f) = Polar $ \(r, phi) ->
+  f (r - dr, phi)
+
 -- Remove (or add) artificial torque (rotation increasing towards limit point)
 torque :: Float -> Polar a -> Polar a
 torque dphi (Polar f) = Polar $ \(r, phi) ->
