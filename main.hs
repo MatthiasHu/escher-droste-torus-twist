@@ -6,10 +6,11 @@ import Data.Maybe (isJust)
 type Color = P.PixelRGB8
 type DiscreteImage = P.Image Color
 
-data NestingParams = NestingParams
-  { center :: (Float, Float)
-  , period :: Float
-  }
+newtype Cartesian a = Cartesian ((Float, Float) -> a)
+type CartesianImage = Cartesian Color
+
+newtype Polar a = Polar ((Float, Float) -> a)
+type PolarImage = Polar Color
 
 lookupPixel :: DiscreteImage -> Int -> Int -> Maybe Color
 lookupPixel img x y =
@@ -20,36 +21,46 @@ lookupPixel img x y =
     w = P.imageWidth img
     h = P.imageHeight img
 
-directQuery :: DiscreteImage -> Float -> Float -> Maybe Color
-directQuery img x y =
---  (trace $ "directQuery " ++ show x ++ "," ++ show y) $
+undiscretize :: DiscreteImage -> Cartesian (Maybe Color)
+undiscretize img = Cartesian $ \(x, y) ->
   lookupPixel img (round x) (round y)
 
-centeredQuery :: NestingParams -> DiscreteImage -> Float -> Float -> Maybe Color
-centeredQuery params@(NestingParams (cx, cy) period) img x y =
-  directQuery img (x + cx) (y + cy)
+newtype NestingScale = NestingScale Float
 
-type PlaneImage = Float -> Float -> Color
+tau :: (Floating a) => a
+tau = 2 * pi
 
--- Social contract:
---   f (period * x) (period * y) = f x y
--- for some "period".
-type NestedImage = Float -> Float -> Color
+toPolar :: NestingScale -> Cartesian a -> Polar a
+toPolar (NestingScale s) (Cartesian f) = Polar $ \(r, phi) ->
+  let
+    x = (s**r * cos (phi * tau))
+    y = (s**r * sin (phi * tau))
+  in
+    f (x, y)
 
--- Note: We should probably better convert to polar coordinate images first,
--- beforeee doing nest or torque.
+fromPolar :: NestingScale -> Polar a -> Cartesian a
+fromPolar (NestingScale s) (Polar f) = Cartesian $ \(x, y) ->
+  let
+    r = log (sqrt (x*x + y*y)) / log s
+    phi = atan2 y x / tau
+  in
+    f (r, phi)
 
+translate :: (Float, Float) -> Cartesian a -> Cartesian a
+translate (cx, cy) (Cartesian f) = Cartesian $ \(x, y) ->
+  f (cx + x, cy + y)
+
+{-
 -- We look up the desired color as far away from the limit point as possible
 -- to retain the best possible resolution.
 -- We assume that the input "partial image" is roughly convex.
-nest :: NestingParams -> (Float -> Float -> Maybe Color) -> NestedImage
-nest params@(NestingParams center period) f x y =
+nest :: Polar (Maybe a) -> Polar a
+nest (Polar f) = Polar $ \(r, phi) ->
   inward (outward 0)
   where
-    x' i = (period^^i) * x
-    y' i = (period^^i) * y
+    r' i = x + (fromIntegral i)
 
-    lookup i = f (x' i) (y' i)
+    lookup i = f (r' i, phi)
     test = isJust . lookup
 
     outward i = if test i then outward (i + 1) else i
@@ -75,21 +86,6 @@ type TorusImage = Float -> Float -> Color
 
 twist :: Float -> TorusImage -> TorusImage
 twist n f x y = f (x + n*y) y
-
-tau :: (Floating a) => a
-tau = 2 * pi
-
-toPolar :: Float -> (Float, Float) -> (Float, Float)
-toPolar period (x, y) = (r, phi)
-  where
-    r = log (sqrt (x*x + y*y)) / log period
-    phi = atan2 y x / tau
-
-fromPolar :: Float -> (Float, Float) -> (Float, Float)
-fromPolar period (r, phi) = (x, y)
-  where
-    x = (period**r * cos (phi * tau))
-    y = (period**r * sin (phi * tau))
 
 toTorus :: Float -> NestedImage -> TorusImage
 toTorus period f r phi = f x y
@@ -157,3 +153,4 @@ main = do
     $ img
 -- main = twistImage "assets/droste.jpg" (NestingParams (140,1455) 10)
 -- main = twistImage "assets/costarica.jpg" (NestingParams (1578,1666) 140)
+-}
