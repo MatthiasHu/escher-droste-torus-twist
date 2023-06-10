@@ -7,7 +7,14 @@ type Color = P.PixelRGB8
 type DiscreteImage = P.Image Color
 
 newtype Cartesian a = Cartesian ((Float, Float) -> a)
+
+-- If (Polar f), then:
+--   f (r, phi + 1) = f (r, phi)
 newtype Polar a = Polar ((Float, Float) -> a)
+
+-- If (Toroidal (Polar f)), then:
+--   f (r + 1, phi) = f (r, phi)
+newtype Toroidal a = Toroidal (Polar a)
 
 lookupPixel :: DiscreteImage -> Int -> Int -> Maybe Color
 lookupPixel img x y =
@@ -60,8 +67,8 @@ translate (cx, cy) (Cartesian f) = Cartesian $ \(x, y) ->
 -- We look up the desired color as far away from the limit point as possible
 -- to retain the best possible resolution.
 -- We assume that the input "partial image" is roughly convex.
-nest :: Polar (Maybe a) -> Polar a
-nest (Polar f) = Polar $ \(r, phi) ->
+nest :: Polar (Maybe a) -> Toroidal a
+nest (Polar f) = Toroidal . Polar $ \(r, phi) ->
   let
     r' i = r + (fromIntegral i)
 
@@ -76,6 +83,9 @@ nest (Polar f) = Polar $ \(r, phi) ->
   in
     inward (outward 0)
 
+forgetToroidal :: Toroidal a -> Polar a
+forgetToroidal (Toroidal polar) = polar
+
 rotate :: Float -> Polar a -> Polar a
 rotate dphi (Polar f) = Polar $ \(r, phi) ->
   f (r, phi - dphi)
@@ -85,8 +95,9 @@ torque :: Float -> Polar a -> Polar a
 torque dphi (Polar f) = Polar $ \(r, phi) ->
   f (r, phi + dphi * r)
 
-twist :: Float -> Polar a -> Polar a
-twist n (Polar f) = Polar $ \(r, phi) ->
+-- We assume that n is an integer.
+twist :: Float -> Toroidal a -> Toroidal a
+twist n (Toroidal (Polar f)) = Toroidal . Polar $ \(r, phi) ->
   f (r + n*phi, phi)
 
 load :: FilePath -> IO DiscreteImage
