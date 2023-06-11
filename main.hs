@@ -122,19 +122,18 @@ save img = do
 main :: IO ()
 main =
   let
-    s = NestingScale 14
-    center = (900,860)
+    s = NestingScale 15
+    center = (900,900)
   in
     load "assets/escher.jpg" >>=
-    (
        undiscretize
     -. translate center
     -. toPolar s
     -. torque (-0.35)
+    -. rotate 0.05
     -. nest
     -. twist 1
     -. forgetToroidal
     -. fromPolar s
     -. discretize 500
     -. save
-    )
