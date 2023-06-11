@@ -12,3 +12,4 @@ and I think it has to do with twisting a torus.
 ## Result
 
 ![the Droste effect picture transformed to imitate Eschers picture](assets/result-1.jpg)
+![Eschers picture with the spiral effect removed](assets/result-2.jpg)

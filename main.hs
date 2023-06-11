@@ -134,6 +134,7 @@ main =
     -. nest
     -. twist 1
     -. forgetToroidal
+    -. zoom 0.5
     -. fromPolar s
-    -. discretize 500
+    -. discretize 1000
     -. save
